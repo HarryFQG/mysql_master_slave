@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd
+						   http://www.springframework.org/schema/mvc
+						   http://www.springframework.org/schema/mvc/spring-mvc-3.2.xsd
+						   http://www.springframework.org/schema/context
+						   http://www.springframework.org/schema/context/spring-context.xsd">
+    <!--开启扫描-->
+    <context:component-scan base-package="com.yijiupi.login.controller"></context:component-scan>
+    <!--开启注解，自动完成了映射器，适配器的注入，还支持JSON-->
+    <mvc:annotation-driven></mvc:annotation-driven>
+    <!--配置视图解析器-->
+    <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <property name="prefix" value="/"/>
+        <property name="suffix" value=".jsp"></property>
+        <property name="order" value="2"></property>
+
+    </bean>
+    <!--freemarker页面静态化-->
+    <!--配置freemarker模板文件的前缀-->
+    <bean class="org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer">
+        <property name="templateLoaderPath" value="/templates/"></property>
+        <property name="freemarkerSettings">
+            <props>
+                <!--兼容传统模式-->
+                <prop key="classic_compatible">true</prop>
+            </props>
+        </property>
+        <property name="defaultEncoding" value="UTF-8"></property>
+    </bean>
+    <!--freemarker模板的后缀-->
+    <bean class="org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver">
+        <property name="suffix" value=".ftl"></property>
+        <property name="contentType" value="text/html;charset=UTF-8"></property>
+        <property name="viewClass" value="com.yijiupi.login.util.FreeMarkerViewUtil"></property>
+        <property name="exposeSpringMacroHelpers" value="true"></property>
+        <property name="exposeRequestAttributes" value="true"></property>
+        <property name="exposeSessionAttributes" value="true"></property>
+        <property name="requestContextAttribute" value="rc"></property>
+        <property name="order" value="1"></property>
+    </bean>
+
+    <!--对物理视图的支撑;如果controller 直接返回的是物理视图就直接映射到页面  -->
+    <mvc:default-servlet-handler/>
+
+    <!--添加对文件上传的支撑-->
+    <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+        <property name="maxUploadSize" value="5242880"></property><!--5M  -->
+    </bean>
+
+    <mvc:interceptors>
+        <mvc:interceptor>
+            <mvc:mapping path="/**"/>
+            <bean class="com.yijiupi.login.interceptor.LoginFilter"></bean>
+        </mvc:interceptor>
+
+    </mvc:interceptors>
+</beans>

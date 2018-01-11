@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                            http://www.springframework.org/schema/context
+                            http://www.springframework.org/schema/context/spring-context.xsd
+                            http://www.springframework.org/schema/tx
+                            http://www.springframework.org/schema/tx/spring-tx.xsd
+                            http://www.springframework.org/schema/aop
+                            http://www.springframework.org/schema/aop/spring-aop.xsd">
+    <!--扫描包-->
+    <context:component-scan base-package="com.yijiupi.login"/>
+    <context:property-placeholder location="classpath:mysqlDB.properties"/>
+
+
+    <!--配置读写分离数据源-->
+    <bean id="dataSource_master" class="com.alibaba.druid.pool.DruidDataSource" destroy-method="clone" init-method="init">
+        <property name="url" value="${mysql.url}"></property>
+        <property name="username" value="${mysql.username}"></property>
+        <property name="password" value="${mysql.password}"></property>
+    </bean>
+    <bean id="dataSource_slave1" class="com.alibaba.druid.pool.DruidDataSource" destroy-method="clone" init-method="init">
+        <property name="url" value="${mysql.url}"></property>
+        <property name="username" value="${mysql.username}"></property>
+        <property name="password" value="${mysql.password}"></property>
+    </bean>
+    <bean id="dataSource_slave2" class="com.alibaba.druid.pool.DruidDataSource" destroy-method="clone" init-method="init">
+        <property name="url" value="${mysql.url}"></property>
+        <property name="username" value="${mysql.username}"></property>
+        <property name="password" value="${mysql.password}"></property>
+    </bean>
+    <!--配置自己的动态数据源，作用更具请求调用那个数据-->
+    <bean id="dataSource" class="com.yijiupi.login.common.DynamicDataSource">
+        <property name="targetDataSources">
+            <map>
+                <entry key="master" value-ref="dataSource_master"/>
+                <entry key="slave_1" value-ref="dataSource_slave1"/>
+                <entry key="slave-2" value-ref="dataSource_slave2"/>
+            </map>
+        </property>
+        <!--默认的数据源-->
+        <property name="defaultTargetDataSource" ref="dataSource_master"/>
+    </bean>
+    <!--配置多数据源的切面配置-->
+    <aop:aspectj-autoproxy/>
+    <bean id="switchDataSourceAspect" class="com.yijiupi.login.common.aop.DataSourceAspect"></bean>
+    <aop:config>
+        <aop:aspect ref="switchDataSourceAspect">
+            <aop:pointcut id="tx" expression="execution(* com.yijiupi.login.service..*.*(..))"/>
+            <aop:before method="before" pointcut-ref="tx"/>
+        </aop:aspect>
+    </aop:config>
+
+    <!--多数据源配置结束-->
+
+
+    <!--配置myBatis的SqlSessionFactory-->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"></property>
+        <property name="configLocation" value="classpath:mybatisConfig.xml"></property>
+        <!--<property name="mapperLocations" value="classpath*:/mapper/*Mapper.xml"/>-->
+    </bean>
+    <!--配置Mapper代理-->
+    <bean id="sqlSession" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.yijiupi.login.mapper"></property>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+    </bean>
+
+    <!--配置事物-->
+    <!--step1:配置事务管理器-->
+    <bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+    <!--step2：配置事务详情
+                也可以是用@Transactional注解进行注解
+    -->
+    <tx:advice id="txAdvice" transaction-manager="txManager">
+        <tx:attributes>
+            <tx:method name="count*" propagation="REQUIRED" read-only="true"/>
+            <tx:method name="get*" propagation="REQUIRED" read-only="true"/>
+            <tx:method name="list*" propagation="REQUIRED" read-only="true"/>
+            <tx:method name="update*" propagation="REQUIRES_NEW" read-only="false"/>
+            <tx:method name="delete*" propagation="REQUIRES_NEW" read-only="false"/>
+            <tx:method name="insert*" propagation="REQUIRES_NEW" read-only="false"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <aop:config>
+        <aop:advisor advice-ref="txAdvice" pointcut="execution(* com.yijiupi.login.service..*.*(..))"/>
+    </aop:config>
+
+    <!--验证码的默认的Kaptcha的bean-->
+    <bean id="captchaProducer" class="com.google.code.kaptcha.impl.DefaultKaptcha" scope="singleton">
+        <property name="config">
+            <bean class="com.google.code.kaptcha.util.Config">
+                <constructor-arg>
+                    <props>
+                        <prop key="kaptcha.session.key">kaptcha.code</prop>
+                        <!-- 无边框 -->
+                        <prop key="kaptcha.border">no</prop>
+                        <prop key="kaptcha.textproducer.font.color">black</prop>
+                        <!-- 渲染效果：水纹：WaterRipple；鱼眼：FishEyeGimpy；阴影：ShadowGimpy -->
+                        <prop key="kaptcha.obscurificator.impl">com.google.code.kaptcha.impl.WaterRipple</prop>
+                        <!-- 不要噪点 -->
+                        <prop key="kaptcha.noise.impl">com.google.code.kaptcha.impl.NoNoise</prop>
+                        <prop key="kaptcha.image.width">90</prop>
+                        <prop key="kaptcha.image.height">33</prop>
+                        <prop key="kaptcha.textproducer.font.size">25</prop>
+                        <prop key="kaptcha.textproducer.char.length">4</prop>
+                        <prop key="kaptcha.textproducer.char.space">5</prop>
+                        <!-- 和登录框背景颜色一致 -->
+                        <prop key="kaptcha.background.clear.from">247,247,247</prop>
+                        <prop key="kaptcha.background.clear.to">247,247,247</prop>
+                    </props>
+                </constructor-arg>
+            </bean>
+        </property>
+    </bean>
+
+
+</beans>
